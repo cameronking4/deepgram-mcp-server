@@ -67,10 +67,11 @@ const handler = createMcpHandler((server) => {
         const utapi = new UTApi({ token: process.env.UPLOADTHING_TOKEN });
         const fileName = `tts-audio-${Date.now()}.mp3`;
         const file = new UTFile([buffer], fileName, { type: "audio/mpeg" });
-        let publicUrl = undefined;
+        let publicUrl = "";
         try {
           const uploadRes = await utapi.uploadFiles([file]);
-          publicUrl = uploadRes[0]?.data?.url;
+          console.log('UploadThing uploadRes:', uploadRes);
+          publicUrl = uploadRes[0]?.data?.url || "";
         } catch (uploadErr) {
           console.error("UploadThing upload error:", uploadErr);
         }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createClient } from "@deepgram/sdk";
 import { createMcpHandler } from "@vercel/mcp-adapter";
+import { UTApi, UTFile } from "uploadthing/server";
 
 export async function OPTIONS() {
   return new Response(null, {
@@ -60,14 +61,39 @@ const handler = createMcpHandler((server) => {
         const arrayBuffer = await response.result.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         const base64Audio = buffer.toString("base64");
+        const dataUrl = `data:audio/mpeg;base64,${base64Audio}`;
+
+        // Upload to UploadThing
+        const utapi = new UTApi({ token: process.env.UPLOADTHING_TOKEN });
+        const fileName = `tts-audio-${Date.now()}.mp3`;
+        const file = new UTFile([buffer], fileName, { type: "audio/mpeg" });
+        let publicUrl = undefined;
+        try {
+          const uploadRes = await utapi.uploadFiles([file]);
+          publicUrl = uploadRes[0]?.data?.url;
+        } catch (uploadErr) {
+          console.error("UploadThing upload error:", uploadErr);
+        }
+
+        const contentArr = [
+          {
+            type: "audio" as const,
+            data: base64Audio,
+            mimeType: "audio/mpeg"
+          },
+          {
+            type: "text" as const,
+            text: `Successfully synthesized speech! Referenced text: ${text}`
+          }
+        ];
+        if (publicUrl) {
+          contentArr.push({
+            type: "text" as const,
+            text: `[Download Link](${publicUrl})`
+          });
+        }
         return {
-          content: [
-            {
-              type: "audio" as const,
-              data: base64Audio,
-              mimeType: "audio/mpeg"
-            }
-          ]
+          content: contentArr
         };
       } catch (error) {
         return handleApiError(error, "Failed to synthesize speech");
